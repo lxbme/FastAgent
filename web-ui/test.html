@@ -19,37 +19,29 @@
     <link rel="stylesheet" href="./font-awesome-4.7.0/css/font-awesome.min.css">
 
 </head>
-<body>
+<body style="padding-bottom: 80px">
     <!-- 导航栏 -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light position-relative">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light position-relative navbar-fixed-top">
 
         <div class="container-fluid">
-            <a class="navbar-brand" href="#"> <i class="fa fa-rocket" aria-hidden="true"></i> Fast Agent</a>
+            <a class="navbar-brand" href="#"> <i class="fa fa-rocket" aria-hidden="true"></i> Fast Agent - Yuhan Li</a>
         </div>
     </nav>
 
     <!-- 主内容区域 -->
     <div class="container my-5">
-        <h1 class="mb-4">Fast Agent for LXB</h1>
+        <h1 class="text-center">🤖</h1>
+        <p class="fw-light text-center">Fast Agent</p>
+        <br>
 
-        <!-- 语言选择器 -->
-        <div class="mb-3">
-            <label for="languageSelect" class="form-label">选择语言：</label>
-            <select id="languageSelect" class="form-select" style="max-width: 200px;">
-                <option value="zh">中文</option>
-                <option value="en">英语</option>
-                <option value="">自动检测</option>
-                <!-- 根据需要添加更多语言 -->
-            </select>
-        </div>
 
         <!-- 录音按钮 -->
-
+        <!--
         <div class="mb-3">
             <button id="recordButton" class="btn btn-success me-2 btn-lg">开始录音</button>
             <button id="stopButton" class="btn btn-secondary btn-lg" disabled>停止录音</button>
         </div>
-        <!--
+
         <button class="position-absolute top-50 start-50 translate-middle" id="rcb">
         <i class="fa fa-microphone"></i>
         </button>
@@ -57,7 +49,7 @@
 
         <!-- 状态和加载动画 -->
         <div class="mb-3">
-            <p id="status" class="text-muted d-inline">按下按钮开始录音</p>
+            <p id="status" class="text-muted d-inline">发送消息开始交流</p>
             <!-- 加载动画 -->
             <div id="loadingSpinner" class="spinner-border text-primary ms-3" role="status" style="display: none;">
                 <span class="visually-hidden">加载中...</span>
@@ -67,6 +59,45 @@
         <!-- 结果显示区域 -->
         <div id="prompt-div"></div>
         <div id="result" class="mt-4"></div>
+
+        <!-- 页面底部固定栏 -->
+        <div class="fixed-bottom bg-light p-3">
+            <div class="container">
+                <div class="row">
+                    <!-- 文本输入框和提交按钮 - 占据50%宽度 -->
+                    <div class="col-md-6 d-flex align-items-center">
+                        <input type="text" class="form-control me-2" id="textInput" placeholder="请输入文本">
+                        <button id="submitButton" class="btn btn-primary" style="min-width:100px;">提交</button>
+                    </div>
+
+                    <!-- 语音输入按钮和语言选择器 - 占据50%宽度 -->
+                    <div class="col-md-6 d-flex justify-content-end align-items-center">
+                        <!-- 录音按钮 -->
+                        <div>
+                            <button id="recordButton" class="btn btn-success me-2 btn-lg">开始录音</button>
+                            <button id="stopButton" class="btn btn-secondary btn-lg" disabled>停止录音</button>
+                        </div>
+
+                        <!-- 语言选择器 -->
+                        <div class="d-flex align-items-center ms-3">
+                            <label for="languageSelect" class="form-label me-2 mb-0" style="min-width: 85px;">识别语言：</label>
+                            <select id="languageSelect" class="form-select" style="max-width: 170px;">
+                                <option value="zh">中文</option>
+                                <option value="en">英语</option>
+                                <option value="">自动检测</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+
+
+
+
 
     </div>
 

@@ -70,13 +70,21 @@ async def process(file: UploadFile = File(...), language: str = Form(None)) -> d
     print(response)
     return response
 
+@app.post("/text_process/")
+# input is a json object
+async def text_process(data: dict = Body(...)):
+    command = agent.agent_analyze(data["text"])
+    response = agent.agent(command)
+    response["prompt"] = data["text"]
+    return response
+
 @app.get("/analyzer-prompt/")
 async def analyzer_prompt():
     return "<p>" + Prompts.ANALYZER_PROMPT + "</p>"
 
-@app.get("/api-registery/")
-async def api_registery():
-    return api_registry.get_registry()
+# @app.get("/api-registery/")
+# async def api_registery():
+#     return api_registry.get_registry()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

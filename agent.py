@@ -94,9 +94,10 @@ def agent(command: str):
     elif command["Mode"] == "Paint":
         return result("image", agent_paint(command["Content"]))
 
-    elif command["Mode"] == "Unknown":
+    elif command["Mode"] == "unknown":
         return result("error", command["Reason"])
-    return "error"
+
+    return result("error", "Panic! I don't know what to do!")
 
 
 def result(type: str, content: str):
