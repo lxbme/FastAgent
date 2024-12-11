@@ -1,273 +1,283 @@
-// script.js
-let mediaRecorder;
-let audioChunks = [];
-const recordButton = document.getElementById('recordButton');
-const stopButton = document.getElementById('stopButton');
-const statusParagraph = document.getElementById('status');
-const resultDiv = document.getElementById('result');
-const languageSelect = document.getElementById('languageSelect');
-const loadingSpinner = document.getElementById('loadingSpinner');
+// Constants and DOM Elements
+const UI = {
+    elements: {
+        recordButton: document.getElementById('recordButton'),
+        stopButton: document.getElementById('stopButton'),
+        statusParagraph: document.getElementById('status'),
+        resultDiv: document.getElementById('result'),
+        languageSelect: document.getElementById('languageSelect'),
+        loadingSpinner: document.getElementById('loadingSpinner'),
+        promptDiv: document.getElementById('prompt-div'),
+        textInput: document.getElementById('textInput'),
+        submitButton: document.getElementById('submitButton')
+    },
+    markdownParser: window.markdownit()
+};
 
-const promptDiv = document.getElementById('prompt-div');
+// Audio Recording Controller
+class AudioRecorder {
+    constructor() {
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+    }
 
-// 初始化 markdown-it
-const md = window.markdownit();
+    async startRecording() {
+        if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error('您的浏览器不支持音频录制功能。');
+        }
 
-
-recordButton.addEventListener('click', async () => {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.start();
-            statusParagraph.textContent = '正在录音...';
-            recordButton.disabled = true;
-            stopButton.disabled = false;
+            this.mediaRecorder = new MediaRecorder(stream);
+            this.audioChunks = [];
 
-            audioChunks = [];
-
-            mediaRecorder.addEventListener('dataavailable', event => {
-                audioChunks.push(event.data);
+            this.mediaRecorder.addEventListener('dataavailable', event => {
+                this.audioChunks.push(event.data);
             });
+
+            this.mediaRecorder.start();
+            return true;
         } catch (err) {
             console.error('获取音频权限失败：', err);
-            alert('无法访问麦克风，请检查浏览器设置。');
+            throw new Error('无法访问麦克风，请检查浏览器设置。');
         }
-    } else {
-        alert('您的浏览器不支持音频录制功能。');
     }
-});
 
-stopButton.addEventListener('click', () => {
-    mediaRecorder.stop();
-    statusParagraph.textContent = '录音已停止，正在上传音频...';
-    recordButton.disabled = false;
-    stopButton.disabled = true;
+    stopRecording() {
+        this.mediaRecorder.stop();
+        return new Promise(resolve => {
+            this.mediaRecorder.addEventListener('stop', () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                resolve(audioBlob);
+            });
+        });
+    }
+}
 
-    mediaRecorder.addEventListener('stop', () => {
-        // 将音频数据合成为一个 Blob 对象
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+// API Service
+class APIService {
+    static async processAudio(audioBlob, language) {
         const formData = new FormData();
         formData.append('file', audioBlob, 'recording.webm');
-        const selectedLanguage = languageSelect.value;
-        formData.append('language', selectedLanguage);
+        formData.append('language', language);
 
-        // 显示加载动画
-        loadingSpinner.style.display = 'inline-block';
-
-        // 发送表单数据到后端 API
-        fetch('http://localhost:8000/', {
+        const response = await fetch('http://localhost:8000/', {
             method: 'POST',
-            body: formData,
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('网络响应不正常');
-            }
-            return response.json();
-        })
-        .then(data => {
-            statusParagraph.textContent = ' ';
-
-            // 隐藏加载动画
-            loadingSpinner.style.display = 'none';
-
-            // 清空之前的结果
-            //resultDiv.innerHTML = '';
-
-            promptDiv.innerHTML = '';
-            const prompt = document.createElement('div');
-            prompt.classList.add("alert")
-            prompt.classList.add("alert-success");
-            prompt.textContent = data.prompt;
-            // promptDiv.appendChild(prompt);
-
-            const singleResult = document.createElement('div');
-            singleResult.classList.add("card")
-            singleResult.style = "margin-top: 20px;"
-            const singleResultBody = document.createElement('div');
-            singleResultBody.classList.add("card-body")
-            singleResult.appendChild(singleResultBody);
-            singleResultBody.appendChild(prompt);
-            resultDiv.append(singleResult);
-
-
-            if (data.type === 'text') {
-                // 解析并渲染 Markdown，并进行安全处理
-                const markdownContent = md.render(data.content);
-                const cleanHTML = DOMPurify.sanitize(markdownContent);
-                //resultDiv.innerHTML = cleanHTML;
-                const textDiv = document.createElement('div');
-                textDiv.innerHTML = cleanHTML;
-                singleResultBody.appendChild(textDiv);
-            } else if (data.type === 'image') {
-                // 使用 Bootstrap Card 显示图片
-                const cardDiv = document.createElement('div');
-                cardDiv.className = 'card';
-                const img = document.createElement('img');
-                img.src = 'data:image/png;base64,' + data.content;
-                img.classList.add('card-img-top');
-                cardDiv.style = "width:512px;"
-                cardDiv.appendChild(img);
-                //resultDiv.appendChild(cardDiv);
-                singleResultBody.appendChild(cardDiv);
-            } else if (data.type === 'mermaid') {
-                // 使用 Bootstrap Card 显示 Mermaid 图表
-                const cardDiv = document.createElement('div');
-                cardDiv.className = 'card';
-
-                const cardBody = document.createElement('div');
-                cardBody.className = 'card-body';
-
-                const mermaidDiv = document.createElement('div');
-                mermaidDiv.className = 'mermaid';
-                mermaidDiv.textContent = data.content;
-
-                cardBody.appendChild(mermaidDiv);
-                cardDiv.appendChild(cardBody);
-                //resultDiv.appendChild(cardDiv);
-                singleResultBody.appendChild(cardDiv);
-                // 渲染 Mermaid 图表
-                mermaid.init(undefined, mermaidDiv);
-            } else if (data.type === 'error') {
-                // 处理未知的类型
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-warning';
-                alertDiv.role = 'alert';
-                alertDiv.textContent = data.content;
-                //resultDiv.appendChild(alertDiv);
-                singleResultBody.appendChild(alertDiv);
-            } else {
-                // 处理未知的类型
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-warning';
-                alertDiv.role = 'alert';
-                alertDiv.textContent = '未知的内容类型。';
-                resultDiv.appendChild(alertDiv);
-            }
-        })
-        .catch(error => {
-            console.error('请求失败：', error);
-            statusParagraph.textContent = '发生错误，请稍后重试。';
-
-            // 隐藏加载动画
-            loadingSpinner.style.display = 'none';
-
-            // 显示错误提示
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-danger';
-            alertDiv.role = 'alert';
-            alertDiv.textContent = '请求失败，请检查网络连接。';
-            resultDiv.prepend(alertDiv);
+            body: formData
         });
-    });
-});
 
-document.getElementById('submitButton').addEventListener('click', async () => {
-    const textInput = document.getElementById('textInput').value;
-    const promptDiv = document.getElementById('prompt-div');
-    const resultDiv = document.getElementById('result');
-    const languageSelect = document.getElementById('languageSelect').value;
+        if (!response.ok) {
+            throw new Error('网络响应不正常');
+        }
 
-    // 清空之前的结果
-    //promptDiv.innerHTML = '';
-    //resultDiv.innerHTML = '';
-
-    // 清空输入框
-    document.getElementById('textInput').value = '';
-
-    if (textInput.trim() === '') {
-        //alert('请输入文本');
-        const alertDiv = document.createElement('div');
-        alertDiv.classList.add('alert', 'alert-warning');
-        alertDiv.role = 'alert';
-        alertDiv.textContent = '输入文本不能为空';
-        resultDiv.appendChild(alertDiv);
-        return;
+        return response.json();
     }
 
-    // 显示加载状态
-    loadingSpinner.style.display = 'inline-block';
-    statusParagraph.textContent = '正在处理文本...';
-
-    try {
-        // 发送POST请求到 /text_process 接口
+    static async processText(text, language) {
         const response = await fetch('http://localhost:8000/text_process', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                text: textInput,
-                language: languageSelect // 发送语言信息
-            })
+            body: JSON.stringify({ text, language })
         });
 
         if (!response.ok) {
             throw new Error('网络响应错误');
         }
-        statusParagraph.textContent = ' ';
 
-        const data = await response.json();
-         loadingSpinner.style.display = 'none';
+        return response.json();
+    }
+}
 
-        promptDiv.innerHTML = '';
+// UI Handler
+class UIHandler {
+    constructor(ui) {
+        this.ui = ui;
+    }
+
+    updateUIForRecordingStart() {
+        this.ui.elements.statusParagraph.textContent = '正在录音...';
+        this.ui.elements.recordButton.disabled = true;
+        this.ui.elements.stopButton.disabled = false;
+    }
+
+    updateUIForRecordingStop() {
+        this.ui.elements.statusParagraph.textContent = '录音已停止，正在上传音频...';
+        this.ui.elements.recordButton.disabled = false;
+        this.ui.elements.stopButton.disabled = true;
+    }
+
+    showLoading() {
+        this.ui.elements.loadingSpinner.style.display = 'inline-block';
+    }
+
+    hideLoading() {
+        this.ui.elements.loadingSpinner.style.display = 'none';
+        this.ui.elements.statusParagraph.textContent = ' ';
+    }
+
+    createPromptElement(data, icon) {
         const prompt = document.createElement('div');
-        prompt.classList.add("alert")
-        prompt.classList.add("alert-success");
-        prompt.textContent = data.prompt;
-        // promptDiv.appendChild(prompt);
+        prompt.classList.add("alert", "alert-light");
 
-        const singleResult = document.createElement('div');
-        singleResult.classList.add("card")
-        singleResult.style = "margin-top: 20px;"
-        const singleResultBody = document.createElement('div');
-        singleResultBody.classList.add("card-body")
-        singleResult.appendChild(singleResultBody);
-        singleResultBody.appendChild(prompt);
-        resultDiv.append(singleResult);
+        const iconElement = document.createElement('i');
+        iconElement.classList.add("fa", icon);
+        iconElement.style = "margin-right: 10px;";
+        iconElement.setAttribute("aria-hidden", "true");
 
-        if (data.type === 'text') {
-            // 处理文本结果
-            const textDiv = document.createElement('div');
-            textDiv.innerHTML = DOMPurify.sanitize(md.render(data.content));  // 处理和渲染 Markdown 内容
-            singleResultBody.appendChild(textDiv);
-        } else if (data.type === 'image') {
-            // 处理图片结果
-            // 使用 Bootstrap Card 显示图片
-                const cardDiv = document.createElement('div');
-                cardDiv.className = 'card';
+        const promptText = document.createElement('span');
+        promptText.textContent = data.prompt;
+
+        prompt.append(iconElement, promptText);
+        return prompt;
+    }
+
+    createResultCard(promptElement) {
+        const card = document.createElement('div');
+        card.classList.add("card");
+        card.style = "margin-top: 20px;";
+
+        const cardBody = document.createElement('div');
+        cardBody.classList.add("card-body");
+
+        card.appendChild(cardBody);
+        cardBody.appendChild(promptElement);
+
+        return { card, cardBody };
+    }
+
+    renderContent(data, cardBody) {
+        switch (data.type) {
+            case 'text':
+                const textDiv = document.createElement('div');
+                const markdownContent = this.ui.markdownParser.render(data.content);
+                textDiv.innerHTML = DOMPurify.sanitize(markdownContent);
+                cardBody.appendChild(textDiv);
+                break;
+
+            case 'image':
+                const imageCard = document.createElement('div');
+                imageCard.className = 'card';
+                imageCard.style = "width:512px;";
+
                 const img = document.createElement('img');
                 img.src = 'data:image/png;base64,' + data.content;
                 img.classList.add('card-img-top');
-                cardDiv.style = "width:512px;"
-                cardDiv.appendChild(img);
-                //resultDiv.appendChild(cardDiv);
-                singleResultBody.appendChild(cardDiv);
-        } else if (data.type === 'mermaid') {
-            // 处理 Mermaid 图表
-            const mermaidDiv = document.createElement('div');
-            mermaidDiv.classList.add('mermaid');
-            mermaidDiv.textContent = data.content;
-            singleResultBody.appendChild(mermaidDiv);
-            mermaid.init(undefined, mermaidDiv);  // 初始化 Mermaid 图表
-        } else if (data.type === 'error') {
-            // 处理错误信息
-            const alertDiv = document.createElement('div');
-            alertDiv.classList.add('alert', 'alert-warning');
-            alertDiv.role = 'alert';
-            alertDiv.textContent = data.content;
-            singleResultBody.appendChild(alertDiv);
+
+                imageCard.appendChild(img);
+                cardBody.appendChild(imageCard);
+                break;
+
+            case 'mermaid':
+                const mermaidDiv = document.createElement('div');
+                mermaidDiv.className = 'mermaid';
+                mermaidDiv.textContent = data.content;
+                cardBody.appendChild(mermaidDiv);
+                mermaid.init(undefined, mermaidDiv);
+                break;
+
+            case 'error':
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-warning';
+                alertDiv.role = 'alert';
+                alertDiv.textContent = data.content;
+                cardBody.appendChild(alertDiv);
+                break;
+
+            default:
+                const unknownAlert = document.createElement('div');
+                unknownAlert.className = 'alert alert-warning';
+                unknownAlert.role = 'alert';
+                unknownAlert.textContent = '未知的内容类型。';
+                cardBody.appendChild(unknownAlert);
         }
-    } catch (error) {
-        loadingSpinner.remove();  // 移除加载动画
-        console.error('请求失败:', error);
-        const alertDiv = document.createElement('div');
-        alertDiv.classList.add('alert', 'alert-danger');
-        alertDiv.role = 'alert';
-        alertDiv.textContent = '请求失败，请稍后再试。';
-        resultDiv.appendChild(alertDiv);
     }
-});
 
+    showError(message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger';
+        alertDiv.role = 'alert';
+        alertDiv.textContent = message;
+        this.ui.elements.resultDiv.prepend(alertDiv);
+    }
+}
 
+// Main App Controller
+class AppController {
+    constructor() {
+        this.recorder = new AudioRecorder();
+        this.uiHandler = new UIHandler(UI);
+        this.initializeEventListeners();
+    }
+
+    initializeEventListeners() {
+        UI.elements.recordButton.addEventListener('click', () => this.handleRecordStart());
+        UI.elements.stopButton.addEventListener('click', () => this.handleRecordStop());
+        UI.elements.submitButton.addEventListener('click', () => this.handleTextSubmit());
+    }
+
+    async handleRecordStart() {
+        try {
+            await this.recorder.startRecording();
+            this.uiHandler.updateUIForRecordingStart();
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    async handleRecordStop() {
+        this.uiHandler.updateUIForRecordingStop();
+        try {
+            const audioBlob = await this.recorder.stopRecording();
+            await this.processAndRenderResult(audioBlob);
+        } catch (error) {
+            console.error('处理录音失败：', error);
+            this.uiHandler.showError('处理录音失败，请稍后重试。');
+        }
+    }
+
+    async handleTextSubmit() {
+        const text = UI.elements.textInput.value.trim();
+        if (!text) {
+            this.uiHandler.showError('输入文本不能为空');
+            return;
+        }
+
+        UI.elements.textInput.value = '';
+        this.uiHandler.showLoading();
+
+        try {
+            const data = await APIService.processText(text, UI.elements.languageSelect.value);
+            this.renderResult(data, 'fa-keyboard-o');
+        } catch (error) {
+            console.error('处理文本失败：', error);
+            this.uiHandler.showError('处理文本失败，请稍后重试。');
+        } finally {
+            this.uiHandler.hideLoading();
+        }
+    }
+
+    async processAndRenderResult(audioBlob) {
+        this.uiHandler.showLoading();
+        try {
+            const data = await APIService.processAudio(audioBlob, UI.elements.languageSelect.value);
+            this.renderResult(data, 'fa-microphone');
+        } catch (error) {
+            console.error('处理音频失败：', error);
+            this.uiHandler.showError('处理音频失败，请稍后重试。');
+        } finally {
+            this.uiHandler.hideLoading();
+        }
+    }
+
+    renderResult(data, iconClass) {
+        const promptElement = this.uiHandler.createPromptElement(data, iconClass);
+        const { card, cardBody } = this.uiHandler.createResultCard(promptElement);
+        this.uiHandler.renderContent(data, cardBody);
+        UI.elements.resultDiv.append(card);
+    }
+}
+
+// Initialize the application
+const app = new AppController();

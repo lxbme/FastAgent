@@ -14,6 +14,10 @@ class Config:
     DRAW_MODEL = "gpt-4o-mini" # GPT model name or "custom"
     PAINT_MODEL = "admruul/anything-v3.0" # Huggingface diffuser model name or "custom"
 
+    TTS_MODEL = "vits" # 可选模型：vits, custom
+    VIT_URL = "http://127.0.0.1:2333/tts"
+    VIT_MAX_LEN = 20
+
 class APIConfig:
     WEATHER = "hefeng" # 可选模型：hefeng, custom
 

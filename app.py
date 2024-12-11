@@ -1,6 +1,6 @@
 import json
 
-from fastapi import FastAPI, File, UploadFile, Form, Body
+from fastapi import FastAPI, File, UploadFile, Form, Body, HTTPException
 import uvicorn
 import os
 import whisper_py
@@ -11,6 +11,8 @@ from llm.llm_gpt import GPTChatMode, GPTAnalyzeMode
 from api.paint_sd import SDPaint
 import agent
 from prompt import Prompts
+from tts.vits import VITS
+from utils.request_template import TTSRequest, TTSResponse
 
 app = FastAPI()
 
@@ -22,7 +24,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.post("/transcribe/")
 async def transcribe(file: UploadFile = File(...), language: str = Form(None)) -> dict:
@@ -85,6 +86,48 @@ async def analyzer_prompt():
 # @app.get("/api-registery/")
 # async def api_registery():
 #     return api_registry.get_registry()
+
+@app.post("/tts", response_model=TTSResponse)
+async def text_to_speech(request: TTSRequest):
+    if Config.TTS_MODEL == "vits":
+        tts_model = VITS()
+    else:
+        raise Exception("TTS model not supported")
+
+    try:
+        audio_base64 = tts_model.text_to_speech(
+            request.text,
+            request.speaker,
+            request.language,
+            request.speed
+        )
+        return TTSResponse(
+            message="Success",
+            audio_base64=audio_base64
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/tts/long_text", response_model=TTSResponse)
+async def long_text_to_speech(request: TTSRequest):
+    if Config.TTS_MODEL == "vits":
+        tts_model = VITS()
+    else:
+        raise Exception("TTS model not supported")
+
+    try:
+        audio_base64 = tts_model.long_text_to_speech(
+            request.text,
+            request.speaker,
+            request.language,
+            request.speed
+        )
+        return TTSResponse(
+            message="Success",
+            audio_base64=audio_base64
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
