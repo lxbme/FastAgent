@@ -39,3 +39,7 @@ This project is a modular AI assistant that aims to make LLM available to users 
 5. Open /web-ui/test.html in your browser.
 6. Enjoy.
 
+## License
+
+This project is licensed under the GNU AGPLv3 - see the [LICENSE](LICENSE) file for details.
+
