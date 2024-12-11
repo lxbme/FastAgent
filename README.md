@@ -1,4 +1,4 @@
-# FastAgent - A fast and efficient reinforcement learning agent
+# FastAgent - A Modular Artificial Intelligence Agent
 
 **!! This program is for learning purposes only for the time being and may have low performance issues or security risks !! **
 
